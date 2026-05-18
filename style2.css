@@ -1,0 +1,111 @@
+.top-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background-color: white;
+    padding: 15px 30px;
+    box-sizing: border-box; 
+    display: flex;
+    justify-content: space-between; 
+    align-items: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.conta-utilizador {
+    cursor: pointer;
+    font-weight: bold;
+    color: #333;
+}
+
+.container-landing {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 200px;
+}
+
+.aviso-badge {
+    background-color: #e4e9f7;
+    color: #1a1a1a;
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-weight: bold;
+    font-size: 14px;
+    margin-bottom: 40px;
+}
+
+.cards-wrapper {
+    display: flex;
+    gap: 30px;
+    justify-content: center;
+}
+
+.card {
+    background-color: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 40px 30px;
+    width: 350px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+}
+
+.card p {
+    color: #666;
+    margin-bottom: 30px;
+    line-height: 1.5;
+}
+
+.icon-box {
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 24px;
+    margin-bottom: 20px;
+}
+
+.icon-lista {
+    background-color: #dbe4ff;
+    color: #1a46b5;
+}
+
+.icon-delegado {
+    background-color: #fce8d5;
+    color: #985023;
+}
+
+.btn-escolher {
+    padding: 12px;
+    width: 100%;
+    border: none;
+    border-radius: 6px;
+    font-weight: bold;
+    color: white;
+    cursor: pointer;
+    font-size: 15px;
+    margin-top: auto;
+}
+
+.btn-azul {
+    background-color: #1c3faa;
+}
+
+.btn-azul:hover {
+    background-color: #153085;
+}
+
+.btn-castanho {
+    background-color: #90481b;
+}
+
+.btn-castanho:hover {
+    background-color: #703714;
+}
