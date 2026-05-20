@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  # Definimos o nome do nosso serviço de backend
+  backend:
+    # Indica onde está o Dockerfile para construir a imagem deste serviço
+    build: ./backend
+    
+    # Mapeamento de portas -> "porta_da_tua_maquina : porta_do_contentor"
+    # Permite-te aceder à API abrindo "http://localhost:8000" no teu browser
+    ports:
+      - "8000:8000"
+      
+    # Volumes: Cria uma ponte em tempo real entre a tua pasta local e o Docker
+    # Graças a isto, sempre que alterares o código no teu PC, o Docker atualiza-se sozinho!
+    volumes:
+      - ./backend:/app
+      
+    # Define variáveis de ambiente úteis para o FastAPI
+    environment:
+      - PYTHONUNBUFFERED=1
+  frontend:
+    # Indica onde está o Dockerfile para construir a imagem deste serviço
+    build: ./frontend
+    
+    # Mapeamento de portas -> "porta_da_tua_maquina : porta_do_contentor"
+    # Permite-te aceder à interface abrindo "http://localhost:8080" no teu browser
+    ports:
+      - "8080:80"
+      
+    # Volumes: Cria uma ponte em tempo real entre a tua pasta local e o Docker
+    # Graças a isto, sempre que alterares o código no teu PC, o Docker atualiza-se sozinho!
+    volumes:
+      - ./frontend:/app
