@@ -26,8 +26,22 @@ class AlunoDB(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     numero_aluno = Column(String(50), unique=True, index=True, nullable=False)
+    ano_letivo = Column(String(20), nullable=True)
     senha = Column(String(100), nullable=False)
     ja_votou = Column(Boolean, default=False)
+
+
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(title="Sistema de Votação Eletrónica - API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def get_db():
@@ -40,6 +54,7 @@ def get_db():
 
 class SignupRequest(BaseModel):
     numero_aluno: str = Field(..., min_length=3)
+    ano_letivo: str = Field(..., min_length=1)
     senha: str = Field(..., min_length=4)
 
 
@@ -53,6 +68,7 @@ def signup(signup_request: SignupRequest, db: Session = Depends(get_db)):
     # Create new student
     novo_aluno = AlunoDB(
         numero_aluno=signup_request.numero_aluno,
+        ano_letivo=signup_request.ano_letivo,
         senha=signup_request.senha 
     )
     try:
