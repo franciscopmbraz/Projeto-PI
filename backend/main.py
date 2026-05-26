@@ -119,26 +119,15 @@ def login(login_request: LoginRequest, db: Session = Depends(get_db)):
         "voto_delegado": aluno.voto_delegado
     }
 
+class CandidatoDB(Base):
+    __tablename__ = "candidatos"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    nome = Column(String(100), nullable=False)
+    tipo = Column(String(50), nullable=False) # 'lista' ou 'delegado'
+    turma = Column(String(20), nullable=True) # Apenas usado se for 'delegado'
 
-CANDIDATOS_LISTAS = [
-    {"id": "lista_a", "nome": "Lista A - A Nossa Voz"},
-    {"id": "lista_b", "nome": "Lista B - Estudantes Unidos"}
-]
 
-CANDIDATOS_DELEGADOS = {
-    "10A": [
-        {"id": "del_1", "nome": "João Pedro"},
-        {"id": "del_2", "nome": "Maria Silva"}
-    ],
-    "11B": [
-        {"id": "del_3", "nome": "Ana Costa"},
-        {"id": "del_4", "nome": "Tiago Santos"}
-    ],
-    "12D": [
-        {"id": "del_5", "nome": "Francisco Braz"},
-        {"id": "del_6", "nome": "Rita Almeida"}
-    ]
-}
 
 class VotoListaRequest(BaseModel):
     numero_aluno: str
@@ -156,12 +145,13 @@ def obter_candidatos(numero_aluno: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Aluno não encontrado.")
     
     # Obtém apenas os candidatos da turma dele
-    delegados = CANDIDATOS_DELEGADOS.get(aluno.ano_letivo, [])
+    listas = db.query(CandidatoDB).filter(CandidatoDB.tipo == "lista").all()
+    delegados = db.query(CandidatoDB).filter(CandidatoDB.tipo == "delegado", CandidatoDB.turma == aluno.ano_letivo).all()
     
     return {
         "turma": aluno.ano_letivo,
-        "listas": CANDIDATOS_LISTAS,
-        "delegados": delegados,
+        "listas": [{"id": c.nome.lower().replace(" ", "_"), "nome": c.nome} for c in listas],
+        "delegados": [{"id": c.nome.lower().replace(" ", "_"), "nome": c.nome} for c in delegados],
         "ja_votou_lista": aluno.voto_turma,
         "ja_votou_delegado": aluno.voto_delegado
     }
@@ -206,3 +196,19 @@ def votar_delegado(req: VotoDelegadoRequest, db: Session = Depends(get_db)):
     return {"status": "sucesso", "mensagem": "Voto no Delegado registado anonimamente!"}
 
 Base.metadata.create_all(bind=engine)   
+
+
+def popular_candidatos_iniciais(db: Session):
+    # Verifica se a tabela já tem dados para não duplicar
+    if db.query(CandidatoDB).first():
+        return
+
+    candidatos = [
+        CandidatoDB(nome="Lista A - A Nossa Voz", tipo="lista"),
+        CandidatoDB(nome="Lista B - Estudantes Unidos", tipo="lista"),
+        CandidatoDB(nome="João Pedro", tipo="delegado", turma="10A"),
+        CandidatoDB(nome="Maria Silva", tipo="delegado", turma="10A"),
+        CandidatoDB(nome="Francisco Braz", tipo="delegado", turma="12D")
+    ]
+    db.add_all(candidatos)
+    db.commit()
