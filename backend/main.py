@@ -83,4 +83,27 @@ def signup(signup_request: SignupRequest, db: Session = Depends(get_db)):
             status_code=409, 
             detail=f"Erro de concorrência detetado. Transação abortada. (ID: {novo_aluno.id})"
         )
+    
+class LoginRequest(BaseModel):
+    numero_aluno: str = Field(..., min_length=3)
+    senha: str = Field(..., min_length=4)
 
+class LoginRequest(BaseModel):
+    numero_aluno: str = Field(..., min_length=3)
+    senha: str = Field(..., min_length=4)
+
+@app.post("/auth/login")
+def login(login_request: LoginRequest, db: Session = Depends(get_db)):
+    #Procura o aluno na base de dados
+    aluno = db.query(AlunoDB).filter(AlunoDB.numero_aluno == login_request.numero_aluno).first()
+    
+    #Verifica se o aluno existe e se a senha está correta
+    if not aluno or aluno.senha != login_request.senha:
+        raise HTTPException(status_code=401, detail="Credenciais inválidas.")
+    
+    # 3. Se estiver tudo bem, dá permissão para entrar
+    return {
+        "status": "sucesso", 
+        "mensagem": "Autenticação efetuada com sucesso!",
+        "ja_votou": aluno.ja_votou
+    }

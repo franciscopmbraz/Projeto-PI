@@ -65,17 +65,24 @@ if (formSignup) {
 
 let formLogin = document.querySelector('#formLogin');
 
-// O redirecionamento solto só vai existir se o formLogin estiver no ecrã!
 if (formLogin) {
+    let botaoSignUp = document.querySelector('.btn-signup');
+    
+    if (botaoSignUp) {
+        botaoSignUp.addEventListener('click', function(evento) {
+            evento.preventDefault(); 
+            window.location.href = 'signup.html';
+        });
+    }
+
     formLogin.addEventListener('submit', async function(evento) {
-        evento.preventDefault(); // Impede a página de recarregar quando clicas no botão
+        evento.preventDefault(); // Impede a página de recarregar
 
         let numeroAluno = document.querySelector('#numero_aluno').value;
         let senhaAluno = document.querySelector('#senha').value;
         
-
         try {
-            // Envia os dados para a tua API (FastAPI) no Docker
+            // Envia os dados para a API
             let resposta = await fetch('http://localhost:8000/auth/login', {
                 method: 'POST',
                 headers: {
@@ -83,15 +90,18 @@ if (formLogin) {
                 },
                 body: JSON.stringify({
                     numero_aluno: numeroAluno,
-                    ano_letivo: anoLetivo,
                     senha: senhaAluno
+                    // Removemos o ano_letivo daqui!
                 })
             });
 
             let dados = await resposta.json();
 
-            // Verifica a resposta da API
+            // Verifica se a password estava correta
             if (resposta.ok) {
+                // Guarda o aluno na memória do browser para sabermos quem vai votar na Landing Page!
+                localStorage.setItem('aluno_logado', numeroAluno);
+                
                 window.location.href = 'landing.html'; // Manda o aluno para o Landing
             } else {
                 // Se der erro mostra o alerta
