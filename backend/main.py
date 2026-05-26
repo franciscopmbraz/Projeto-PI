@@ -193,9 +193,7 @@ def votar_delegado(req: VotoDelegadoRequest, db: Session = Depends(get_db)):
     aluno.voto_delegado = True
     db.commit()
     
-    return {"status": "sucesso", "mensagem": "Voto no Delegado registado anonimamente!"}
-
-Base.metadata.create_all(bind=engine)   
+    return {"status": "sucesso", "mensagem": "Voto no Delegado registado anonimamente!"}  
 
 
 def popular_candidatos_iniciais(db: Session):
@@ -212,3 +210,9 @@ def popular_candidatos_iniciais(db: Session):
     ]
     db.add_all(candidatos)
     db.commit()
+    
+
+
+db = SessionLocal()
+popular_candidatos_iniciais(db)
+Base.metadata.create_all(bind=engine) 
