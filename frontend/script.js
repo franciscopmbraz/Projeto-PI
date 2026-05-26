@@ -99,9 +99,12 @@ if (formLogin) {
 
             // Verifica se a password estava correta
             if (resposta.ok) {
-                // Guarda o aluno na memória do browser para sabermos quem vai votar na Landing Page!
+                // Guardar na memória do navegador o número do aluno e os votos para usar na Landing
                 localStorage.setItem('aluno_logado', numeroAluno);
-                
+                localStorage.setItem('ano_letivo', dados.ano_letivo);
+                localStorage.setItem('voto_turma', dados.voto_turma);
+                localStorage.setItem('voto_delegado', dados.voto_delegado);
+
                 window.location.href = 'landing.html'; // Manda o aluno para o Landing
             } else {
                 // Se der erro mostra o alerta

@@ -28,8 +28,8 @@ class AlunoDB(Base):
     numero_aluno = Column(String(50), unique=True, index=True, nullable=False)
     ano_letivo = Column(String(20), nullable=True)
     senha = Column(String(100), nullable=False)
-    ja_votou = Column(Boolean, default=False)
-
+    voto_turma = Column(Boolean, default=False)
+    voto_delegado = Column(Boolean, default=False)
 
 Base.metadata.create_all(bind=engine)
 
@@ -69,7 +69,9 @@ def signup(signup_request: SignupRequest, db: Session = Depends(get_db)):
     novo_aluno = AlunoDB(
         numero_aluno=signup_request.numero_aluno,
         ano_letivo=signup_request.ano_letivo,
-        senha=signup_request.senha 
+        senha=signup_request.senha,
+        voto_turma=False,
+        voto_delegado=False
     )
     try:
         db.add(novo_aluno)
@@ -105,5 +107,6 @@ def login(login_request: LoginRequest, db: Session = Depends(get_db)):
     return {
         "status": "sucesso", 
         "mensagem": "Autenticação efetuada com sucesso!",
-        "ja_votou": aluno.ja_votou
+        "voto_turma": aluno.voto_turma,
+        "voto_delegado": aluno.voto_delegado
     }
