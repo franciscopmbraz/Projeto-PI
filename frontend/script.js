@@ -116,4 +116,4 @@ if (formLogin) {
             alert("Erro ao conectar à Base de Dados. Verifica se o Docker está a rodar.");
         }
     });
-}
+}//dsa
