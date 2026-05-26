@@ -57,7 +57,7 @@ if (formSignup) {
 
         } catch (erro) {
             console.error("Erro na API:", erro);
-            alert("Erro ao conectar à Base de Dados. Verifica se o Docker está a rodar.");
+            alert("Erro ao conectar à Base de Dados");
         }
     });
 }
@@ -113,7 +113,7 @@ if (formLogin) {
 
         } catch (erro) {
             console.error("Erro na API:", erro);
-            alert("Erro ao conectar à Base de Dados. Verifica se o Docker está a rodar.");
+            alert("Erro ao conectar à Base de Dados.");
         }
     });
-}//dsa
+}

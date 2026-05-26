@@ -31,7 +31,23 @@ class AlunoDB(Base):
     voto_turma = Column(Boolean, default=False)
     voto_delegado = Column(Boolean, default=False)
 
-Base.metadata.create_all(bind=engine)
+
+class Votaçao_turmaDB(Base):
+    __tablename__ = "votacao_turma"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    numero_aluno = Column(String(50), nullable=False)
+    ano_letivo = Column(String(20), nullable=True)
+    voto = Column(String(100), nullable=False)
+
+class Votacao_delegadoDB(Base):
+    __tablename__ = "votacao_delegado"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    numero_aluno = Column(String(50), nullable=False)
+    ano_letivo = Column(String(20), nullable=True)
+    voto = Column(String(100), nullable=False)
+
 
 app = FastAPI(title="Sistema de Votação Eletrónica - API")
 
@@ -42,7 +58,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 def get_db():
     db = SessionLocal()
@@ -110,3 +125,6 @@ def login(login_request: LoginRequest, db: Session = Depends(get_db)):
         "voto_turma": aluno.voto_turma,
         "voto_delegado": aluno.voto_delegado
     }
+
+
+Base.metadata.create_all(bind=engine)   
