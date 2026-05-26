@@ -67,9 +67,40 @@ let formLogin = document.querySelector('#formLogin');
 
 // O redirecionamento solto só vai existir se o formLogin estiver no ecrã!
 if (formLogin) {
-    let botaoLogin = document.querySelector('.btn-login');
-    botaoLogin.addEventListener('click', function(evento) {
-        evento.preventDefault();
-        window.location.href = 'landing.html';
+    formLogin.addEventListener('submit', async function(evento) {
+        evento.preventDefault(); // Impede a página de recarregar quando clicas no botão
+
+        let numeroAluno = document.querySelector('#numero_aluno').value;
+        let senhaAluno = document.querySelector('#senha').value;
+        
+
+        try {
+            // Envia os dados para a tua API (FastAPI) no Docker
+            let resposta = await fetch('http://localhost:8000/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    numero_aluno: numeroAluno,
+                    ano_letivo: anoLetivo,
+                    senha: senhaAluno
+                })
+            });
+
+            let dados = await resposta.json();
+
+            // Verifica a resposta da API
+            if (resposta.ok) {
+                window.location.href = 'landing.html'; // Manda o aluno para o Landing
+            } else {
+                // Se der erro mostra o alerta
+                alert("Erro: " + dados.detail);
+            }
+
+        } catch (erro) {
+            console.error("Erro na API:", erro);
+            alert("Erro ao conectar à Base de Dados. Verifica se o Docker está a rodar.");
+        }
     });
 }
