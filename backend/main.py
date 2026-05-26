@@ -147,6 +147,8 @@ class VotoListaRequest(BaseModel):
 class VotoDelegadoRequest(BaseModel):
     numero_aluno: str
     escolha: str
+
+
 @app.get("/api/candidatos/{numero_aluno}")
 def obter_candidatos(numero_aluno: str, db: Session = Depends(get_db)):
     aluno = db.query(AlunoDB).filter(AlunoDB.numero_aluno == numero_aluno).first()
@@ -194,7 +196,7 @@ def votar_delegado(req: VotoDelegadoRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Já votaste no Delegado de turma!")
 
     # Cria o voto anónimo mas guarda o ano/turma para sabermos a quem pertence o voto
-    novo_voto = Votacao_turmaDB(ano_letivo=aluno.ano_letivo, voto_delegado=req.escolha)
+    novo_voto = Votacao_turmaDB(turma=aluno.ano_letivo, voto_delegado=req.escolha)
     db.add(novo_voto)
     
     # Bloqueia o aluno nesta eleição
