@@ -117,3 +117,119 @@ if (formLogin) {
         }
     });
 }
+
+// ==========================================
+// 3. LÓGICA DO PAINEL DE VOTAÇÃO (landing.html)
+// ==========================================
+let btnEleicaoLista = document.querySelector('.btn-azul');
+let btnEleicaoDelegado = document.querySelector('.btn-castanho');
+
+// Só corre isto se os botões da landing existirem na página atual
+if (btnEleicaoLista && btnEleicaoDelegado) {
+    let alunoLogado = localStorage.getItem('aluno_logado');
+    if (!alunoLogado) {
+        window.location.href = 'login.html';
+    }
+
+    // Verifica na BD se o aluno já votou, para desativar (bloquear) o botão
+    async function verificarBloqueios() {
+        try {
+            let resposta = await fetch(`${API_BASE_URL}/api/candidatos/${alunoLogado}`);
+            let dados = await resposta.json();
+            if (resposta.ok) {
+                if (dados.ja_votou_lista) {
+                    btnEleicaoLista.textContent = "Voto Submetido";
+                    btnEleicaoLista.disabled = true;
+                    btnEleicaoLista.style.backgroundColor = "#cccccc";
+                }
+                if (dados.ja_votou_delegado) {
+                    btnEleicaoDelegado.textContent = "Voto Submetido";
+                    btnEleicaoDelegado.disabled = true;
+                    btnEleicaoDelegado.style.backgroundColor = "#cccccc";
+                }
+            }
+        } catch (erro) { console.error(erro); }
+    }
+    verificarBloqueios();
+
+    // Em vez do aviso popup, enviamos o aluno para a nova página!
+    // Adicionamos "?tipo=lista" no link para a página saber o que mostrar
+    btnEleicaoLista.addEventListener('click', () => window.location.href = 'votacao.html?tipo=lista');
+    btnEleicaoDelegado.addEventListener('click', () => window.location.href = 'votacao.html?tipo=delegado');
+}
+
+
+
+let formVotacao = document.querySelector('#form-votacao-pagina');
+
+if (formVotacao) {
+    let alunoLogado = localStorage.getItem('aluno_logado');
+    if (!alunoLogado) window.location.href = 'login.html';
+
+    // Vai ao Link do navegador ver qual foi o botão que o utilizador clicou na página anterior
+    let params = new URLSearchParams(window.location.search);
+    let tipoEleicao = params.get('tipo'); 
+
+    let tituloPagina = document.querySelector('#titulo-eleicao');
+    let listaOpcoes = document.querySelector('#lista-opcoes');
+
+    // Carrega os dados da Base de Dados
+    async function carregarOpcoes() {
+        try {
+            let resposta = await fetch(`${API_BASE_URL}/api/candidatos/${alunoLogado}`);
+            let dados = await resposta.json();
+
+            if (tipoEleicao === 'lista') {
+                tituloPagina.textContent = "Eleição: Associação de Estudantes";
+                dados.listas.forEach(lista => {
+                    listaOpcoes.innerHTML += `
+                        <label style="display: block; margin: 15px 0; font-size: 18px; cursor: pointer;">
+                            <input type="radio" name="candidato" value="${lista.id}" required style="transform: scale(1.3); margin-right: 10px;">
+                            <b>${lista.nome}</b>
+                        </label>
+                    `;
+                });
+            } else if (tipoEleicao === 'delegado') {
+                tituloPagina.textContent = `Eleição: Delegado (Turma ${dados.turma})`;
+                if (dados.delegados.length === 0) {
+                    listaOpcoes.innerHTML = "<p>Sem candidatos registados nesta turma.</p>";
+                } else {
+                    dados.delegados.forEach(del => {
+                        listaOpcoes.innerHTML += `
+                            <label style="display: block; margin: 15px 0; font-size: 18px; cursor: pointer;">
+                                <input type="radio" name="candidato" value="${del.id}" required style="transform: scale(1.3); margin-right: 10px;">
+                                <b>${del.nome}</b>
+                            </label>
+                        `;
+                    });
+                }
+            }
+        } catch (e) { console.error(e); }
+    }
+    carregarOpcoes();
+
+    // Ação do Botão "Confirmar Voto"
+    formVotacao.addEventListener('submit', async function(evento) {
+        evento.preventDefault();
+        
+        let escolhido = document.querySelector('input[name="candidato"]:checked').value;
+        let urlEndpoint = (tipoEleicao === 'lista') ? "/api/votar/lista" : "/api/votar/delegado";
+
+        try {
+            let resposta = await fetch(`${API_BASE_URL}${urlEndpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ numero_aluno: alunoLogado, escolha: escolhido })
+            });
+            
+            let dados = await resposta.json();
+            
+            if (resposta.ok) {
+                alert("✅ " + dados.mensagem);
+                window.location.href = 'landing.html'; // Devolve o aluno à base trancando o botão!
+            } else {
+                alert("Erro: " + dados.detail);
+            }
+        } catch (e) { alert("Erro ao enviar o voto."); }
+    });
+}

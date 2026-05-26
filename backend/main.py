@@ -32,21 +32,18 @@ class AlunoDB(Base):
     voto_delegado = Column(Boolean, default=False)
 
 
-class Votaçao_turmaDB(Base):
+class Votacao_turmaDB(Base):  
     __tablename__ = "votacao_turma"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    numero_aluno = Column(String(50), nullable=False)
-    ano_letivo = Column(String(20), nullable=True)
-    voto = Column(String(100), nullable=False)
 
-class Votacao_delegadoDB(Base):
-    __tablename__ = "votacao_delegado"
+    id = Column(Integer, primary_key=True, index=True)
+    turma = Column(String(50), nullable=False)
+    voto_delegado = Column(String(50), nullable=False)
+
+class Votacao_listaDB(Base):
+    __tablename__ = "votacao_lista"
     
     id = Column(Integer, primary_key=True, index=True)
-    numero_aluno = Column(String(50), nullable=False)
-    ano_letivo = Column(String(20), nullable=True)
-    voto = Column(String(100), nullable=False)
+    voto_lista = Column(String(50), nullable=False)
 
 
 app = FastAPI(title="Sistema de Votação Eletrónica - API")
@@ -105,10 +102,6 @@ class LoginRequest(BaseModel):
     numero_aluno: str = Field(..., min_length=3)
     senha: str = Field(..., min_length=4)
 
-class LoginRequest(BaseModel):
-    numero_aluno: str = Field(..., min_length=3)
-    senha: str = Field(..., min_length=4)
-
 @app.post("/auth/login")
 def login(login_request: LoginRequest, db: Session = Depends(get_db)):
     #Procura o aluno na base de dados
@@ -126,5 +119,88 @@ def login(login_request: LoginRequest, db: Session = Depends(get_db)):
         "voto_delegado": aluno.voto_delegado
     }
 
+
+CANDIDATOS_LISTAS = [
+    {"id": "lista_a", "nome": "Lista A - A Nossa Voz"},
+    {"id": "lista_b", "nome": "Lista B - Estudantes Unidos"}
+]
+
+CANDIDATOS_DELEGADOS = {
+    "10A": [
+        {"id": "del_1", "nome": "João Pedro"},
+        {"id": "del_2", "nome": "Maria Silva"}
+    ],
+    "11B": [
+        {"id": "del_3", "nome": "Ana Costa"},
+        {"id": "del_4", "nome": "Tiago Santos"}
+    ],
+    "12D": [
+        {"id": "del_5", "nome": "Francisco Braz"},
+        {"id": "del_6", "nome": "Rita Almeida"}
+    ]
+}
+
+class VotoListaRequest(BaseModel):
+    numero_aluno: str
+    escolha: str
+
+class VotoDelegadoRequest(BaseModel):
+    numero_aluno: str
+    escolha: str
+@app.get("/api/candidatos/{numero_aluno}")
+def obter_candidatos(numero_aluno: str, db: Session = Depends(get_db)):
+    aluno = db.query(AlunoDB).filter(AlunoDB.numero_aluno == numero_aluno).first()
+    if not aluno:
+        raise HTTPException(status_code=404, detail="Aluno não encontrado.")
+    
+    # Obtém apenas os candidatos da turma dele
+    delegados = CANDIDATOS_DELEGADOS.get(aluno.ano_letivo, [])
+    
+    return {
+        "turma": aluno.ano_letivo,
+        "listas": CANDIDATOS_LISTAS,
+        "delegados": delegados,
+        "ja_votou_lista": aluno.voto_turma,
+        "ja_votou_delegado": aluno.voto_delegado
+    }
+
+
+@app.post("/api/votar/lista")
+def votar_lista(req: VotoListaRequest, db: Session = Depends(get_db)):
+
+    aluno = db.query(AlunoDB).filter(AlunoDB.numero_aluno == req.numero_aluno).first()
+    if not aluno:
+        raise HTTPException(status_code=404, detail="Aluno não encontrado.")
+    if aluno.voto_turma:
+        raise HTTPException(status_code=400, detail="Já votaste na Lista da Associação!")
+
+    # Cria o voto sem número de aluno
+    novo_voto = Votacao_listaDB(voto_lista=req.escolha)
+    db.add(novo_voto)
+    
+    # Bloqueia o aluno para não votar mais nesta eleição
+    aluno.voto_turma = True
+    db.commit()
+    
+    return {"status": "sucesso", "mensagem": "Voto na Associação registado anonimamente!"}
+
+
+@app.post("/api/votar/delegado")
+def votar_delegado(req: VotoDelegadoRequest, db: Session = Depends(get_db)):
+    aluno = db.query(AlunoDB).filter(AlunoDB.numero_aluno == req.numero_aluno).first()
+    if not aluno:
+        raise HTTPException(status_code=404, detail="Aluno não encontrado.")
+    if aluno.voto_delegado:
+        raise HTTPException(status_code=400, detail="Já votaste no Delegado de turma!")
+
+    # Cria o voto anónimo mas guarda o ano/turma para sabermos a quem pertence o voto
+    novo_voto = Votacao_turmaDB(ano_letivo=aluno.ano_letivo, voto_delegado=req.escolha)
+    db.add(novo_voto)
+    
+    # Bloqueia o aluno nesta eleição
+    aluno.voto_delegado = True
+    db.commit()
+    
+    return {"status": "sucesso", "mensagem": "Voto no Delegado registado anonimamente!"}
 
 Base.metadata.create_all(bind=engine)   
