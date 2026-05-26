@@ -212,7 +212,6 @@ def popular_candidatos_iniciais(db: Session):
     db.commit()
     
 
-
+Base.metadata.create_all(bind=engine) 
 db = SessionLocal()
 popular_candidatos_iniciais(db)
-Base.metadata.create_all(bind=engine) 

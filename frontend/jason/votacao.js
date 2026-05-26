@@ -1,5 +1,5 @@
 // frontend/votacao.js
-let formVotacao = document.querySelector('#form-votacao-pagina');
+let formVotacao = document.querySelector('#form-votacao');
 
 if (formVotacao) {
     let alunoLogado = localStorage.getItem('aluno_logado');
@@ -16,13 +16,15 @@ if (formVotacao) {
             let resposta = await fetch(`${API_BASE_URL}/api/candidatos/${alunoLogado}`);
             let dados = await resposta.json();
 
+            listaOpcoes.innerHTML = "";
+
             if (tipoEleicao === 'lista') {
                 tituloPagina.textContent = "Eleição: Associação de Estudantes";
                 dados.listas.forEach(lista => {
                     listaOpcoes.innerHTML += `
-                        <label style="display: block; margin: 15px 0; font-size: 18px; cursor: pointer;">
-                            <input type="radio" name="candidato" value="${lista.id}" required style="transform: scale(1.3); margin-right: 10px;">
-                            <b>${lista.nome}</b>
+                        <label class="opcao-item">
+                            <input type="radio" name="candidato" value="${lista.id}" class="opcao-radio" required>
+                            <span class="nome-candidato">${lista.nome}</span>
                         </label>
                     `;
                 });
@@ -33,9 +35,9 @@ if (formVotacao) {
                 } else {
                     dados.delegados.forEach(del => {
                         listaOpcoes.innerHTML += `
-                            <label style="display: block; margin: 15px 0; font-size: 18px; cursor: pointer;">
-                                <input type="radio" name="candidato" value="${del.id}" required style="transform: scale(1.3); margin-right: 10px;">
-                                <b>${del.nome}</b>
+                            <label class="opcao-item">
+                                <input type="radio" name="candidato" value="${del.id}" class="opcao-radio" required>
+                                <span class="nome-candidato">${del.nome}</span>
                             </label>
                         `;
                     });
