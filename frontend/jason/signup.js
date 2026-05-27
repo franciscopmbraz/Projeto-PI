@@ -13,8 +13,8 @@ if (formSignup) {
             alert("O Número de Aluno tem de ter pelo menos 3 caracteres.");
             return; 
         }
-        if (anoLetivo.length < 1) {
-            alert("O Ano Escolar não pode estar vazio.");
+        if (!anoLetivo) {
+            alert("Por favor, selecione uma turma válida.");
             return;
         }
         if (senhaAluno.length < 4) {
