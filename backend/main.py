@@ -1,217 +1,411 @@
-import os
-import uuid
-from fastapi import FastAPI, HTTPException, Depends
+﻿from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-from sqlalchemy import create_engine, Column, Integer, String, Column as DBColumn, Boolean
-from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func
 
+from database import Base, SessionLocal, engine, get_db
+from models import (
+    UtilizadorDB,
+    Votacao_listaDB,
+    Votacao_delegadoDB,
+    Voto_utilizador_delegadoDB,
+    Candidato_delegado_utilizadorDB,
+    Voto_utilizador_listaDB,
+    Candidato_listaDB,
+    TurmaDB,
 
-DB_USER = os.environ.get("DB_USER", "user_votacao")
-DB_PASSWORD = os.environ.get("DB_PASSWORD", "senha_segura")
-DB_HOST = os.environ.get("DB_HOST", "db")
-DB_NAME = os.environ.get("DB_NAME", "sve_db")
+)
+from schemas import (
+    LoginRequest,
+    SignupRequest,
+    VotoDelegadoRequest,
+    VotoListaRequest,
+    VotacaoDelegadoRequest,
+    VotacaoListaRequest,
+    CandidatoDelegadoRequest,
+    CandidatoListaRequest,
+    TurmaRequest,
+)
 
-DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}"
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-app = FastAPI()
-
-
-class AlunoDB(Base):
-    __tablename__ = "alunos"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    numero_aluno = Column(String(50), unique=True, index=True, nullable=False)
-    ano_letivo = Column(String(20), nullable=True)
-    senha = Column(String(100), nullable=False)
-    voto_turma = Column(Boolean, default=False)
-    voto_delegado = Column(Boolean, default=False)
-
-
-class Votacao_turmaDB(Base):  
-    __tablename__ = "votacao_turma"
-
-    id = Column(Integer, primary_key=True, index=True)
-    turma = Column(String(50), nullable=False)
-    voto_delegado = Column(String(50), nullable=False)
-
-class Votacao_listaDB(Base):
-    __tablename__ = "votacao_lista"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    voto_lista = Column(String(50), nullable=False)
-
+from seed_db import seed_database
 
 app = FastAPI(title="Sistema de Votação Eletrónica - API")
-
+#TODO fix the origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-class SignupRequest(BaseModel):
-    numero_aluno: str = Field(..., min_length=3)
-    ano_letivo: str = Field(..., min_length=1)
-    senha: str = Field(..., min_length=4)
-
-
+# AUTH
 @app.post("/auth/signup")
-def signup(signup_request: SignupRequest, db: Session = Depends(get_db)):
-    # Check if the student already exists
-    existing_student = db.query(AlunoDB).filter(AlunoDB.numero_aluno == signup_request.numero_aluno).first()
+def signup(signup_request: SignupRequest, db=Depends(get_db)):
+    existing_student = db.query(UtilizadorDB).filter(UtilizadorDB.numero == signup_request.numero).first()
     if existing_student:
         raise HTTPException(status_code=400, detail="Student already exists")
 
-    # Create new student
-    novo_aluno = AlunoDB(
-        numero_aluno=signup_request.numero_aluno,
-        ano_letivo=signup_request.ano_letivo,
+    novo_utilizador = UtilizadorDB(
+        numero=signup_request.numero,
+        nome=signup_request.nome,
+        turma_id=signup_request.turma_id,
         senha=signup_request.senha,
-        voto_turma=False,
-        voto_delegado=False
     )
     try:
-        db.add(novo_aluno)
+        db.add(novo_utilizador)
         db.commit()
-        db.refresh(novo_aluno)
-        return {"message": "Student registered successfully", "student_id": novo_aluno.id}
-    
+        db.refresh(novo_utilizador)
+        return {"message": "User registered successfully", "id": novo_utilizador.id}
     except IntegrityError:
         db.rollback()
         raise HTTPException(
-            status_code=409, 
-            detail=f"Erro de concorrência detetado. Transação abortada. (ID: {novo_aluno.id})"
+            status_code=409,
+            detail=f"Erro de concorrência detetado. Transação abortada. (ID: {novo_utilizador.id})",
         )
-    
-class LoginRequest(BaseModel):
-    numero_aluno: str = Field(..., min_length=3)
-    senha: str = Field(..., min_length=4)
+
 
 @app.post("/auth/login")
-def login(login_request: LoginRequest, db: Session = Depends(get_db)):
-    #Procura o aluno na base de dados
-    aluno = db.query(AlunoDB).filter(AlunoDB.numero_aluno == login_request.numero_aluno).first()
-    
-    #Verifica se o aluno existe e se a senha está correta
-    if not aluno or aluno.senha != login_request.senha:
+def login(login_request: LoginRequest, db=Depends(get_db)):
+    utilizador = db.query(UtilizadorDB).filter(UtilizadorDB.numero == login_request.numero).first()
+    if not utilizador or utilizador.senha != login_request.senha:
         raise HTTPException(status_code=401, detail="Credenciais inválidas.")
-    
-    # 3. Se estiver tudo bem, dá permissão para entrar
+
     return {
-        "status": "sucesso", 
+        "status": "sucesso",
         "mensagem": "Autenticação efetuada com sucesso!",
-        "voto_turma": aluno.voto_turma,
-        "voto_delegado": aluno.voto_delegado
+        "id": utilizador.id,
+        "numero": utilizador.numero,
+        "nome": utilizador.nome,
+        "turma_id": utilizador.turma_id,
     }
 
-class CandidatoDB(Base):
-    __tablename__ = "candidatos"
+
+# TURMAS
+
+@app.post("/api/turmas")
+def criar_turma(req: TurmaRequest, db=Depends(get_db)):
+    turma_existente = db.query(TurmaDB).filter(TurmaDB.nome == req.nome).first()
+    if turma_existente:
+        raise HTTPException(status_code=400, detail="Já existe uma turma com este nome.")
     
-    id = Column(Integer, primary_key=True, index=True)
-    nome = Column(String(100), nullable=False)
-    tipo = Column(String(50), nullable=False) # 'lista' ou 'delegado'
-    turma = Column(String(20), nullable=True) # Apenas usado se for 'delegado'
-
-
-
-class VotoListaRequest(BaseModel):
-    numero_aluno: str
-    escolha: str
-
-class VotoDelegadoRequest(BaseModel):
-    numero_aluno: str
-    escolha: str
-
-
-@app.get("/api/candidatos/{numero_aluno}")
-def obter_candidatos(numero_aluno: str, db: Session = Depends(get_db)):
-    aluno = db.query(AlunoDB).filter(AlunoDB.numero_aluno == numero_aluno).first()
-    if not aluno:
-        raise HTTPException(status_code=404, detail="Aluno não encontrado.")
+    nova_turma = TurmaDB(nome=req.nome)
     
-    # Obtém apenas os candidatos da turma dele
-    listas = db.query(CandidatoDB).filter(CandidatoDB.tipo == "lista").all()
-    delegados = db.query(CandidatoDB).filter(CandidatoDB.tipo == "delegado", CandidatoDB.turma == aluno.ano_letivo).all()
-    
+    db.add(nova_turma)
+    db.commit()
+    db.refresh(nova_turma)
+
+    return {"status": "SUCCESS", "message": "Turma criada com sucesso", "turma_id": nova_turma.id}
+
+@app.get("/api/turmas")
+def listar_turmas(db=Depends(get_db)):
+    turmas = db.query(TurmaDB).all()
+    return {"status": "SUCCESS", "turmas": [{"id": turma.id, "nome": turma.nome} for turma in turmas]}
+# VOTAÇÕES DELEGADO
+
+@app.post("/api/votacoes/delegado")
+def criar_votacao_delegado(req: VotacaoDelegadoRequest, db=Depends(get_db)):
+    novo_votacao_delegado = Votacao_delegadoDB(
+        turma_id=req.turma_id,
+        titulo=req.titulo,
+        start_date=req.start_date,
+        end_date=req.end_date,
+    )
+
+    db.add(novo_votacao_delegado)
+    db.commit()
+    db.refresh(novo_votacao_delegado)
+
+    return {"status": "SUCCESS", "message": "Votação de delegado registered", "votacao_id": novo_votacao_delegado.id}
+
+@app.get("/api/votacoes/delegado")
+def listar_votacoes_delegado(db=Depends(get_db)):
+    votacoes = db.query(Votacao_delegadoDB).all()
     return {
-        "turma": aluno.ano_letivo,
-        "listas": [{"id": c.nome.lower().replace(" ", "_"), "nome": c.nome} for c in listas],
-        "delegados": [{"id": c.nome.lower().replace(" ", "_"), "nome": c.nome} for c in delegados],
-        "ja_votou_lista": aluno.voto_turma,
-        "ja_votou_delegado": aluno.voto_delegado
+        "status": "SUCCESS",
+        "votacoes": [
+            {
+                "id": v.id,
+                "titulo": v.titulo,
+                "turma_id": v.turma_id,
+                "start_date": v.start_date,
+                "end_date": v.end_date,
+            }
+            for v in votacoes
+        ],
+    }
+
+@app.post("/api/candidatos/delegado")
+def registrar_candidato_delegado(req: CandidatoDelegadoRequest, db=Depends(get_db)):
+    utilizador = db.query(UtilizadorDB).filter(UtilizadorDB.id == req.utilizador_id).first()
+    if not utilizador:
+        raise HTTPException(status_code=404, detail="utilizador não encontrado.")
+    
+    votacao = db.query(Votacao_delegadoDB).filter(Votacao_delegadoDB.id == req.votacao_id).first()
+    if not votacao:
+        raise HTTPException(status_code=404, detail="votacao não encontrado.")
+    
+    if utilizador.turma != votacao.turma:
+        raise HTTPException(status_code=400, detail="Não podes enlistar como candidato nesta votação.")
+
+    candidato_existente = db.query(Candidato_delegado_utilizadorDB).filter(
+        Candidato_delegado_utilizadorDB.utilizador_id == utilizador.id,
+        Candidato_delegado_utilizadorDB.votacao_delegado_id == votacao.id
+    ).first()
+
+    if candidato_existente:
+        raise HTTPException(status_code=400, detail="Já estás registado como candidato nesta votação.")
+    
+    novo_candidato = Candidato_delegado_utilizadorDB(
+        utilizador_id=utilizador.id,
+        votacao_delegado_id=votacao.id
+    )
+    
+    db.add(novo_candidato)
+    db.commit()
+    db.refresh(novo_candidato)
+
+    return {"status": "SUCCESS", "message": "Candidato registado com sucesso", "utilizador_id": novo_candidato.utilizador_id, "votacao_id": novo_candidato.votacao_delegado_id}
+
+@app.get("/api/candidatos/delegado/{votacao_id}")
+def listar_candidatos_delegado(votacao_id: int, db=Depends(get_db)):
+    candidatos = (
+        db.query(Candidato_delegado_utilizadorDB)
+        .filter(Candidato_delegado_utilizadorDB.votacao_delegado_id == votacao_id)
+        .all()
+    )
+    return {
+        "status": "SUCCESS",
+        "candidatos": [
+            {
+                "id": c.id,
+                "utilizador_id": c.utilizador_id,
+                "votacao_delegado_id": c.votacao_delegado_id,
+                "nome": c.utilizador.nome,
+                "descricao": c.descricao,
+            }
+            for c in candidatos
+        ],
+    }
+
+@app.get("/api/candidatos/lista/{votacao_id}")
+def listar_candidatos_lista(votacao_id: int, db=Depends(get_db)):
+    candidatos = (
+        db.query(Candidato_listaDB)
+        .filter(Candidato_listaDB.votacao_lista_id == votacao_id)
+        .all()
+    )
+    return {
+        "status": "SUCCESS",
+        "candidatos": [
+            {
+                "id": c.id,
+                "titulo": c.titulo,
+                "votacao_lista_id": c.votacao_lista_id,
+                "descricao": c.descricao,
+            }
+            for c in candidatos
+        ],
+    }
+
+@app.post("/api/votos/delegado")
+def votar_delegado(req: VotoDelegadoRequest, db=Depends(get_db)):
+    utilizador = db.query(UtilizadorDB).filter(UtilizadorDB.id == req.utilizador_id).first()
+    if not utilizador:
+        raise HTTPException(status_code=404, detail="utilizador não encontrado.")
+    
+    votacao_delegado = db.query(Votacao_delegadoDB).filter(Votacao_delegadoDB.id == req.votacao_id).first()
+    if not votacao_delegado:
+            raise HTTPException(status_code=404, detail="votacao_turma não encontrado.")
+    
+    if utilizador.turma_id != votacao_delegado.turma_id:
+        raise HTTPException(status_code=400, detail="Não podes votar nesta votação.")
+
+    voto_existente = db.query(Voto_utilizador_delegadoDB).filter( Voto_utilizador_delegadoDB.utilizador_id == utilizador.id, Voto_utilizador_delegadoDB.votacao_delegado_id == votacao_delegado.id).first()
+
+    if voto_existente:
+        raise HTTPException(status_code=400, detail="Já votaste nesta votação.")
+    
+    # validate candidato exists and belongs to this votacao
+    candidato = db.query(Candidato_delegado_utilizadorDB).filter(Candidato_delegado_utilizadorDB.id == req.escolha).first()
+    if not candidato:
+        raise HTTPException(status_code=404, detail="Escolha (candidato) não encontrado.")
+
+    if candidato.votacao_delegado_id != votacao_delegado.id:
+        raise HTTPException(status_code=400, detail="Escolha não pertence a esta votação.")
+
+    novo_voto = Voto_utilizador_delegadoDB(
+        utilizador_id=utilizador.id,
+        votacao_delegado_id=votacao_delegado.id,
+        escolha=candidato.id,
+    )
+
+    try:
+        db.add(novo_voto)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Erro ao registar voto. Verifique a integridade dos dados.")
+
+    return {"status": "SUCCESS", "message": "Vote registered"}
+
+@app.get("/api/resultados/delegado")
+def resultados_delegado(votacao_id: int, db=Depends(get_db)):
+    resultados = (
+        db.query(
+            Candidato_delegado_utilizadorDB.id,
+            UtilizadorDB.nome,
+            func.count(Voto_utilizador_delegadoDB.escolha).label("votos")
+        )
+        .join(UtilizadorDB, UtilizadorDB.id == Candidato_delegado_utilizadorDB.utilizador_id)
+        .outerjoin(Voto_utilizador_delegadoDB, Voto_utilizador_delegadoDB.escolha == Candidato_delegado_utilizadorDB.id)
+        .filter(Candidato_delegado_utilizadorDB.votacao_delegado_id == votacao_id)
+        .group_by(Candidato_delegado_utilizadorDB.id, UtilizadorDB.nome)
+        .all()
+    )
+    return {
+        "status": "SUCCESS",
+        "resultados": [{"candidato_id": r.id, "nome": r.nome, "votos": r.votos} for r in resultados]
     }
 
 
-@app.post("/api/votar/lista")
-def votar_lista(req: VotoListaRequest, db: Session = Depends(get_db)):
+# VOTAÇÕES DE LISTA
 
-    aluno = db.query(AlunoDB).filter(AlunoDB.numero_aluno == req.numero_aluno).first()
-    if not aluno:
-        raise HTTPException(status_code=404, detail="Aluno não encontrado.")
-    if aluno.voto_turma:
-        raise HTTPException(status_code=400, detail="Já votaste na Lista da Associação!")
+@app.post("/api/votacoes/lista")
+def criar_votacao_lista(req: VotacaoListaRequest, db=Depends(get_db)):
+    novo_votacao_lista = Votacao_listaDB(
+        titulo=req.titulo,
+        start_date=req.start_date,
+        end_date=req.end_date,
+    )
 
-    # Cria o voto sem número de aluno
-    novo_voto = Votacao_listaDB(voto_lista=req.escolha)
-    db.add(novo_voto)
-    
-    # Bloqueia o aluno para não votar mais nesta eleição
-    aluno.voto_turma = True
+    db.add(novo_votacao_lista)
     db.commit()
+    db.refresh(novo_votacao_lista)
+
+    return {"status": "SUCCESS", "message": "Votação de lista registered", "votacao_id": novo_votacao_lista.id}
+
+@app.get("/api/votacoes/lista")
+def listar_votacoes_lista(db=Depends(get_db)):
+    votacoes = db.query(Votacao_listaDB).all()
+    return {
+        "status": "SUCCESS",
+        "votacoes": [
+            {
+                "id": v.id,
+                "titulo": v.titulo,
+                "start_date": v.start_date,
+                "end_date": v.end_date,
+            }
+            for v in votacoes
+        ],
+    }
+
+@app.post("/api/candidatos/lista")
+def registrar_candidato_lista(req: CandidatoListaRequest, db=Depends(get_db)):
     
-    return {"status": "sucesso", "mensagem": "Voto na Associação registado anonimamente!"}
-
-
-@app.post("/api/votar/delegado")
-def votar_delegado(req: VotoDelegadoRequest, db: Session = Depends(get_db)):
-    aluno = db.query(AlunoDB).filter(AlunoDB.numero_aluno == req.numero_aluno).first()
-    if not aluno:
-        raise HTTPException(status_code=404, detail="Aluno não encontrado.")
-    if aluno.voto_delegado:
-        raise HTTPException(status_code=400, detail="Já votaste no Delegado de turma!")
-
-    # Cria o voto anónimo mas guarda o ano/turma para sabermos a quem pertence o voto
-    novo_voto = Votacao_turmaDB(turma=aluno.ano_letivo, voto_delegado=req.escolha)
-    db.add(novo_voto)
+    votacao = db.query(Votacao_listaDB).filter(Votacao_listaDB.id == req.votacao_id).first()
+    if not votacao:
+        raise HTTPException(status_code=404, detail="votacao não encontrado.")
     
-    # Bloqueia o aluno nesta eleição
-    aluno.voto_delegado = True
+    candidato_existente = db.query(Candidato_listaDB).filter(
+        Candidato_listaDB.titulo == req.titulo,
+    ).first()
+
+    if candidato_existente:
+        raise HTTPException(status_code=400, detail="Já estás registado como candidato nesta votação.")
+    
+    novo_candidato = Candidato_listaDB(
+        votacao_lista_id=votacao.id,
+        titulo=req.titulo,
+        descricao=req.descricao
+    )
+    
+    db.add(novo_candidato)
     db.commit()
+    db.refresh(novo_candidato)
+
+    return {"status": "SUCCESS", "message": "Candidato registado com sucesso", "votacao_id": novo_candidato.votacao_lista_id}
+
+
+@app.post("/api/votos/lista")
+def votar_lista(req: VotoListaRequest, db=Depends(get_db)):
+    utilizador = db.query(UtilizadorDB).filter(UtilizadorDB.id == req.utilizador_id).first()
+    if not utilizador:
+        raise HTTPException(status_code=404, detail="utilizador não encontrado.")
     
-    return {"status": "sucesso", "mensagem": "Voto no Delegado registado anonimamente!"}  
+    votacao_lista = db.query(Votacao_listaDB).filter(Votacao_listaDB.id == req.votacao_id).first()
+    if not votacao_lista:
+            raise HTTPException(status_code=404, detail="votacao_turma não encontrado.")
+    voto_existente = db.query(Voto_utilizador_listaDB).filter(
+        Voto_utilizador_listaDB.utilizador_id == utilizador.id,
+        Voto_utilizador_listaDB.votacao_lista_id == votacao_lista.id,
+    ).first()
 
+    if voto_existente:
+        raise HTTPException(status_code=400, detail="Já votaste nesta votação.")
 
-def popular_candidatos_iniciais(db: Session):
-    # Verifica se a tabela já tem dados para não duplicar
-    if db.query(CandidatoDB).first():
-        return
+    candidato = db.query(Candidato_listaDB).filter(Candidato_listaDB.id == req.escolha).first()
+    if not candidato:
+        raise HTTPException(status_code=404, detail="Escolha (candidato) não encontrado.")
 
-    candidatos = [
-        CandidatoDB(nome="Lista A - A Nossa Voz", tipo="lista"),
-        CandidatoDB(nome="Lista B - Estudantes Unidos", tipo="lista"),
-        CandidatoDB(nome="João Pedro", tipo="delegado", turma="10A"),
-        CandidatoDB(nome="Maria Silva", tipo="delegado", turma="10A"),
-        CandidatoDB(nome="Francisco Braz", tipo="delegado", turma="12D")
-    ]
-    db.add_all(candidatos)
-    db.commit()
-    
+    novo_voto = Voto_utilizador_listaDB(
+        utilizador_id=utilizador.id,
+        votacao_lista_id=votacao_lista.id,
+        escolha=candidato.id,
+    )
 
-Base.metadata.create_all(bind=engine) 
-db = SessionLocal()
-popular_candidatos_iniciais(db)
+    try:
+        db.add(novo_voto)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Erro ao registar voto na lista.")
+
+    return {"status": "SUCCESS", "message": "Vote registered"}
+
+@app.get("/api/resultados/lista")
+def resultados_lista(votacao_id: int, db=Depends(get_db)):
+    resultados = (
+        db.query(
+            Candidato_listaDB.id,
+            Candidato_listaDB.titulo,
+            func.count(Voto_utilizador_listaDB.escolha).label("votos")
+        )
+        .outerjoin(Voto_utilizador_listaDB, Voto_utilizador_listaDB.escolha == Candidato_listaDB.id)
+        .filter(Candidato_listaDB.votacao_lista_id == votacao_id)
+        .group_by(Candidato_listaDB.id, Candidato_listaDB.titulo)
+        .all()
+    )
+    return {
+        "status": "SUCCESS",
+        "resultados": [{"candidato_id": r.id, "titulo": r.titulo, "votos": r.votos} for r in resultados]
+    }
+
+#VERIFICAÇÕES
+@app.get("/api/votos/delegado/verificar")
+def verificar_voto_delegado(utilizador_id: int, votacao_id: int, db=Depends(get_db)):
+    utilizador = db.query(UtilizadorDB).filter(UtilizadorDB.id == utilizador_id).first()
+    votacao = db.query(Votacao_delegadoDB).filter(Votacao_delegadoDB.id == votacao_id).first()
+
+    turma_errada = utilizador and votacao and utilizador.turma_id != votacao.turma_id
+    ja_votou = db.query(Voto_utilizador_delegadoDB).filter(
+        Voto_utilizador_delegadoDB.utilizador_id == utilizador_id,
+        Voto_utilizador_delegadoDB.votacao_delegado_id == votacao_id
+    ).first() is not None
+
+    return {"ja_votou": ja_votou, "turma_errada": turma_errada}
+
+@app.get("/api/votos/lista/verificar")
+def verificar_voto_lista(utilizador_id: int, votacao_id: int, db=Depends(get_db)):
+    ja_votou = db.query(Voto_utilizador_listaDB).filter(
+        Voto_utilizador_listaDB.utilizador_id == utilizador_id,
+        Voto_utilizador_listaDB.votacao_lista_id == votacao_id
+    ).first() is not None
+
+    return {"ja_votou": ja_votou, "turma_errada": False}
+
+@app.on_event("startup")
+async def startup_event():
+    Base.metadata.create_all(bind=engine)
+    seed_database()

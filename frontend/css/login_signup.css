@@ -36,8 +36,7 @@ input, select {
     display: block;   
 }
 
-
-.btn-login {  
+.confirm_auth  {  
     padding: 10px 20px; 
     background-color: #0056b3; 
     color: white; 
@@ -48,7 +47,7 @@ input, select {
     margin-top: 15px;
 }
 
-.btn-signup {  
+.redirect_auth  {  
     padding: 10px 20px; 
     background-color: #ffffff; 
     color: black; 
@@ -59,8 +58,8 @@ input, select {
     margin-top: 15px;
 }
 
-.btn-login:hover { background-color: #004494; }
-.btn-signup:hover { background-color: #79b7ff; }
+.confirm_auth:hover { background-color: #004494; }
+.redirect_auth:hover { background-color: #e0e0e0; }
 
 
 label {

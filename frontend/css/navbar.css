@@ -1,0 +1,10 @@
+/* Navbar custom styles */
+.navbar-user-name {
+    font-weight: 500;
+    color: #333;
+}
+
+.navbar-brand {
+    color: #0d6efd !important;
+    font-size: 1.3rem;
+}
