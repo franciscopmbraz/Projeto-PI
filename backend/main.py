@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func
 
+
+
 from database import Base, SessionLocal, engine, get_db
 from models import (
     UtilizadorDB,
@@ -26,14 +28,16 @@ from schemas import (
     CandidatoListaRequest,
     TurmaRequest,
 )
-
 from seed_db import seed_database
 
+from passlib.context import CryptContext
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 app = FastAPI(title="Sistema de Votação Eletrónica - API")
-#TODO fix the origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:8080"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -50,7 +54,7 @@ def signup(signup_request: SignupRequest, db=Depends(get_db)):
         numero=signup_request.numero,
         nome=signup_request.nome,
         turma_id=signup_request.turma_id,
-        senha=signup_request.senha,
+        senha=pwd_context.hash(signup_request.senha),
     )
     try:
         db.add(novo_utilizador)
@@ -61,14 +65,14 @@ def signup(signup_request: SignupRequest, db=Depends(get_db)):
         db.rollback()
         raise HTTPException(
             status_code=409,
-            detail=f"Erro de concorrência detetado. Transação abortada. (ID: {novo_utilizador.id})",
+            detail=f"Erro de concorrência detetado. Transação abortada. (ID: { novo_utilizador.id })",
         )
 
 
 @app.post("/auth/login")
-def login(login_request: LoginRequest, db=Depends(get_db)):
+def login(login_request: LoginRequest, db=Depends( get_db)):
     utilizador = db.query(UtilizadorDB).filter(UtilizadorDB.numero == login_request.numero).first()
-    if not utilizador or utilizador.senha != login_request.senha:
+    if not utilizador or not pwd_context.verify(login_request.senha, utilizador.senha):
         raise HTTPException(status_code=401, detail="Credenciais inválidas.")
 
     return {
@@ -78,8 +82,13 @@ def login(login_request: LoginRequest, db=Depends(get_db)):
         "numero": utilizador.numero,
         "nome": utilizador.nome,
         "turma_id": utilizador.turma_id,
+        "is_admin": utilizador.is_admin,
     }
 
+def require_admin(utilizador_id: int, db):
+    user = db.query(UtilizadorDB).filter(UtilizadorDB.id == utilizador_id).first()
+    if not user or not user.is_admin :
+        raise HTTPException(status_code=403, detail="Acesso negado.")
 
 # TURMAS
 
@@ -91,20 +100,29 @@ def criar_turma(req: TurmaRequest, db=Depends(get_db)):
     
     nova_turma = TurmaDB(nome=req.nome)
     
-    db.add(nova_turma)
+    db.add(nova_turma )
     db.commit()
-    db.refresh(nova_turma)
+    db.refresh(nova_turma )
 
-    return {"status": "SUCCESS", "message": "Turma criada com sucesso", "turma_id": nova_turma.id}
+    return {"status": "SUCCESS", "message": "Turma criada com sucesso", "turma_id": nova_turma.id }
 
 @app.get("/api/turmas")
 def listar_turmas(db=Depends(get_db)):
-    turmas = db.query(TurmaDB).all()
-    return {"status": "SUCCESS", "turmas": [{"id": turma.id, "nome": turma.nome} for turma in turmas]}
+    turmas =  db.query(TurmaDB).all()
+    return {"status": "SUCCESS", "turmas": [{"id": turma.id, "nome": turma.nome} for turma in turmas] }
+
+
+@app.get("/api/utilizadores/turma/{turma_id}")
+def listar_utilizadores_turma(turma_id: int, db=Depends(get_db)):
+    utilizadores = db.query(UtilizadorDB).filter(UtilizadorDB.turma_id == turma_id).all()
+    return {
+        "status": "SUCCESS",
+        "utilizadores": [{"id": u.id, "nome": u.nome, "numero": u.numero} for u in utilizadores]
+    }
 # VOTAÇÕES DELEGADO
 
 @app.post("/api/votacoes/delegado")
-def criar_votacao_delegado(req: VotacaoDelegadoRequest, db=Depends(get_db)):
+def criar_votacao_delegado(req: VotacaoDelegadoRequest, db=Depends(get_db)) :
     novo_votacao_delegado = Votacao_delegadoDB(
         turma_id=req.turma_id,
         titulo=req.titulo,
@@ -116,7 +134,7 @@ def criar_votacao_delegado(req: VotacaoDelegadoRequest, db=Depends(get_db)):
     db.commit()
     db.refresh(novo_votacao_delegado)
 
-    return {"status": "SUCCESS", "message": "Votação de delegado registered", "votacao_id": novo_votacao_delegado.id}
+    return {"status": "SUCCESS", "message":  "Votação de delegado registered", "votacao_id": novo_votacao_delegado.id}
 
 @app.get("/api/votacoes/delegado")
 def listar_votacoes_delegado(db=Depends(get_db)):
@@ -134,6 +152,18 @@ def listar_votacoes_delegado(db=Depends(get_db)):
             for v in votacoes
         ],
     }
+
+@app.delete("/api/votacoes/delegado/{votacao_id}")
+def deletar_votacao_delegado(votacao_id: int, utilizador_id: int, db=Depends(get_db)):
+    require_admin(utilizador_id, db)
+    votacao = db.query(Votacao_delegadoDB).filter(Votacao_delegadoDB.id == votacao_id).first()
+    if not votacao:
+        raise HTTPException(status_code=404, detail="Votação não encontrada.")
+    db.query(Voto_utilizador_delegadoDB).filter(Voto_utilizador_delegadoDB.votacao_delegado_id == votacao_id).delete()
+    db.query(Candidato_delegado_utilizadorDB).filter(Candidato_delegado_utilizadorDB.votacao_delegado_id  == votacao_id).delete()
+    db.delete(votacao)
+    db.commit()
+    return {"status": "SUCCESS", "message": "Votação eliminada." }
 
 @app.post("/api/candidatos/delegado")
 def registrar_candidato_delegado(req: CandidatoDelegadoRequest, db=Depends(get_db)):
@@ -226,7 +256,6 @@ def votar_delegado(req: VotoDelegadoRequest, db=Depends(get_db)):
     if voto_existente:
         raise HTTPException(status_code=400, detail="Já votaste nesta votação.")
     
-    # validate candidato exists and belongs to this votacao
     candidato = db.query(Candidato_delegado_utilizadorDB).filter(Candidato_delegado_utilizadorDB.id == req.escolha).first()
     if not candidato:
         raise HTTPException(status_code=404, detail="Escolha (candidato) não encontrado.")
@@ -300,6 +329,18 @@ def listar_votacoes_lista(db=Depends(get_db)):
             for v in votacoes
         ],
     }
+
+@app.delete("/api/votacoes/lista/{votacao_id}")
+def deletar_votacao_lista(votacao_id: int, utilizador_id: int, db=Depends(get_db)):
+    require_admin(utilizador_id, db)
+    votacao = db.query(Votacao_listaDB).filter(Votacao_listaDB.id == votacao_id).first()
+    if not votacao:
+        raise HTTPException(status_code=404, detail="Votação não encontrada.")
+    db.query(Voto_utilizador_listaDB).filter(Voto_utilizador_listaDB.votacao_lista_id == votacao_id).delete()
+    db.query(Candidato_listaDB).filter(Candidato_listaDB.votacao_lista_id == votacao_id).delete()
+    db.delete(votacao)
+    db.commit()
+    return {"status": "SUCCESS", "message": "Votação eliminada."}
 
 @app.post("/api/candidatos/lista")
 def registrar_candidato_lista(req: CandidatoListaRequest, db=Depends(get_db)):

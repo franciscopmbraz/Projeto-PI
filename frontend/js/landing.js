@@ -1,6 +1,9 @@
-
 function main() {
+    if (!localStorage.getItem('aluno_id')) {
+        window.location.href = 'login.html';
+    } else {
     load_votacoes();
+    }
 }
 
 async function load_votacoes() {

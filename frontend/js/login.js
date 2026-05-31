@@ -1,12 +1,16 @@
-//frontend/login.js
 function main() {
+    if (localStorage.getItem('aluno_id')) {
+        window.location.href = 'landing.html';
+    } else {
     initLogin();
+    }
 }
 
 function initLogin() {
     console.log("Inicializando login.js");
     let formLogin = document.querySelector('#formLogin');
 
+    
     if (formLogin) {
         formLogin.addEventListener('submit', async function(evento) {
             evento.preventDefault(); 
@@ -31,7 +35,7 @@ function initLogin() {
                     if (dados.nome) localStorage.setItem('aluno_nome', dados.nome);
                     if (dados.numero) localStorage.setItem('aluno_numero', dados.numero);
                     if (dados.turma_id) localStorage.setItem('aluno_turma', dados.turma_id);
-
+                    if (dados.is_admin) localStorage.setItem('is_admin', dados.is_admin);
                     window.location.href = 'landing.html';
                 } else {
                     alert("Erro: " + dados.detail);

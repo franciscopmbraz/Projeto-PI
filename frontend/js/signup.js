@@ -1,5 +1,3 @@
-// frontend/signup.js
-
 function initSignup() {
     let formSignup = document.querySelector('#formsignup');
 
@@ -57,7 +55,7 @@ function initSignup() {
                 }
             } catch (erro) {
                 console.error("Erro na API:", erro);
-                alert(erro);
+                alert("Erro na API: " + erro.message);
             }
         });
     }

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, Integer, String, ForeignKey
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean
 from sqlalchemy.orm import relationship
 
 from database import Base
@@ -10,8 +10,9 @@ class UtilizadorDB(Base):
     numero = Column(String(50), unique=True, index=True, nullable=False)
     nome = Column(String(100), nullable=True)
     turma_id = Column(Integer, ForeignKey("turmas.id"), nullable=True)
-    senha = Column(String(100), nullable=False)
-    
+    senha = Column(String(255), nullable=False)
+    is_admin = Column(Boolean, default=False, nullable=False) 
+
     votos = relationship("Voto_utilizador_delegadoDB", back_populates="utilizador")
     candidaturas = relationship("Candidato_delegado_utilizadorDB", back_populates="utilizador")
 

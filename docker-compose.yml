@@ -1,5 +1,4 @@
 services:
-  # Frontend (Interface do Utilizador)
   frontend:
     build: ./frontend
     ports:
@@ -9,7 +8,6 @@ services:
     depends_on:
       - backend
 
-  # Backend (API em FastAPI)
   backend:
     build: ./backend
     ports:
@@ -23,9 +21,8 @@ services:
       - DB_NAME=${MARIADB_DATABASE}
       - DB_HOST=db
     depends_on:
-      - db
-
-  # Base de Dados (MariaDB)
+      db:
+        condition: service_healthy 
   db:
     image: mariadb:10.11
     restart: always
@@ -38,8 +35,13 @@ services:
       - "3306:3306"
     volumes:
       - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 10s
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
-  # Ferramenta Gráfica para ver a Base de Dados no Browser
   phpmyadmin:
     image: phpmyadmin:5.2
     restart: always
@@ -50,8 +52,8 @@ services:
       PMA_USER: ${MARIADB_USER}
       PMA_PASSWORD: ${MARIADB_PASSWORD}
     depends_on:
-      - db
+      db:
+        condition: service_healthy  
 
-# Volume permanente para guardar os votos com segurança
 volumes:
   db_data:

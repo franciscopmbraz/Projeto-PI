@@ -12,6 +12,8 @@ from models import (
     Voto_utilizador_listaDB,
 )
 
+from passlib.context import CryptContext
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def create_turma(db, nome: str):
     turma = db.query(TurmaDB).filter(TurmaDB.nome == nome).first()
@@ -30,12 +32,24 @@ def create_utilizador(db, numero: str, nome: str, turma_id: int, senha: str):
     if utilizador:
         return utilizador
 
-    utilizador = UtilizadorDB(numero=numero, nome=nome, turma_id=turma_id, senha=senha)
+    senha_hash = pwd_context.hash(senha)
+    utilizador = UtilizadorDB(numero=numero, nome=nome, turma_id=turma_id, is_admin=False, senha=senha_hash)
     db.add(utilizador)
     db.commit()
     db.refresh(utilizador)
     return utilizador
 
+def create_admin(db, numero: str, nome: str, senha: str):
+    existente = db.query(UtilizadorDB).filter(UtilizadorDB.numero == numero).first()
+    if existente:
+        return existente
+
+    senha_hash = pwd_context.hash(senha)
+    admin = UtilizadorDB(numero=numero, nome=nome, senha=senha_hash, is_admin=True, turma_id=None)
+    db.add(admin)
+    db.commit()
+    db.refresh(admin)
+    return admin
 
 def create_votacao_delegado(db, turma_id: int, titulo: str, start_date=None, end_date=None):
     votacao = (

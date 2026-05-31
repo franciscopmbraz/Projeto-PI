@@ -118,7 +118,6 @@ async function carregarVotacao(tipo, votacaoId, alunoId) {
                 });
                 const d = await r.json();
                 if (r.ok) {
-                    alert('Voto registado com sucesso!');
                     mostrarResultados(tipo, votacaoId, 'ja-votou');
                 } else if (voteErrorShouldShowResults(r, d)) {
                     alert('Já votaste ou não podes votar nesta votação. A mostrar resultados.');
